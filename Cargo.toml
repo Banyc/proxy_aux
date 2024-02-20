@@ -1,0 +1,15 @@
+[package]
+name = "proxy_aux"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+sudo = "0.6"
+tokio = { version = "1", features = ["full"] }
+xshell = "0.2"
+
+[[bin]]
+name = "proxyaux"
+path = "src/main.rs"
