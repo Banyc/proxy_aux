@@ -12,9 +12,6 @@ mod macos;
 #[derive(Debug, Clone, Args)]
 pub struct CmdArgs {
     #[clap(long)]
-    /// Directly forwarded without being hijacked
-    pub remote_proxy: Vec<IpAddr>,
-    #[clap(long)]
     /// The entrance of your proxy chain
     pub local_socks_server: SocketAddr,
     #[clap(long)]
@@ -24,7 +21,6 @@ pub struct CmdArgs {
 impl CmdArgs {
     pub async fn run(&self) -> anyhow::Result<()> {
         let cx = HijackL4Context {
-            remote_proxy: self.remote_proxy.clone(),
             local_socks_server: self.local_socks_server,
             bin: self.bin.clone(),
         };
@@ -47,8 +43,6 @@ pub async fn serve(cx: &HijackL4Context) -> anyhow::Result<()> {
 
 #[derive(Debug, Clone)]
 pub struct HijackL4Context {
-    /// Directly forwarded without being hijacked
-    pub remote_proxy: Vec<IpAddr>,
     /// The entrance of your proxy chain
     pub local_socks_server: SocketAddr,
     /// Path to the tun-to-socks service binary

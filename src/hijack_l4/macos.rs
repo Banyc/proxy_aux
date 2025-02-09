@@ -18,7 +18,7 @@ pub async fn serve(cx: &HijackL4Context) -> anyhow::Result<()> {
     let mut tun_service_join = tokio::task::JoinSet::new();
     tun_service_join.spawn(tun_service);
 
-    let route = MacosRoute::new(cx.remote_proxy.clone(), tun.clone());
+    let route = MacosRoute::new(tun.clone());
     route.setup().await?;
 
     tokio::select! {
@@ -60,7 +60,7 @@ impl Tun2Socks {
             let sh = Shell::new().expect("shell unavailable");
             cmd!(
                 sh,
-                "sudo {bin} -device {tun_name} -proxy socks5://{local_socks_server} -interface en0"
+                "sudo {bin} -device {tun_name} -proxy socks5://{local_socks_server} -interface lo0"
             )
             .run()?;
             Ok(())
@@ -82,14 +82,13 @@ impl Tun2Socks {
 
 struct MacosRoute {
     tun: TunMeta,
-    remote_proxy: Vec<std::net::IpAddr>,
 }
 impl MacosRoute {
-    pub fn new(remote_proxy: Vec<std::net::IpAddr>, tun: TunMeta) -> Self
+    pub fn new(tun: TunMeta) -> Self
     where
         Self: Sized,
     {
-        Self { tun, remote_proxy }
+        Self { tun }
     }
 
     pub async fn setup(&self) -> anyhow::Result<()> {
@@ -98,12 +97,6 @@ impl MacosRoute {
             for net in NETS {
                 let tun_name = &self.tun.name;
                 cmd!(sh, "sudo route add -net {net} -interface {tun_name}").run()?;
-            }
-
-            let default_gateway = default_gateway()?;
-            for remote_proxy in &self.remote_proxy {
-                let remote_proxy = remote_proxy.to_string();
-                cmd!(sh, "sudo route add -host {remote_proxy} {default_gateway}").run()?;
             }
             Ok(())
         })
@@ -116,18 +109,7 @@ impl Drop for MacosRoute {
         for net in NETS {
             let _ = cmd!(sh, "sudo route delete -net {net}").run();
         }
-        for remote_proxy in &self.remote_proxy {
-            let remote_proxy = remote_proxy.to_string();
-            let _ = cmd!(sh, "sudo route delete -host {remote_proxy}").run();
-        }
     }
-}
-
-fn default_gateway() -> anyhow::Result<String> {
-    let sh = Shell::new().expect("shell unavailable");
-    let cmd = r#"route -n get default | grep "gateway:" | awk "{print \$2}""#;
-    let o = cmd!(sh, "bash -c {cmd}").output()?;
-    Ok(String::from_utf8(o.stdout)?)
 }
 
 const NETS: [&str; 8] = [
